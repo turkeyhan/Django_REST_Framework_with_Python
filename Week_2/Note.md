@@ -222,3 +222,178 @@ admin.site.register(Photo)
 >   >   > {}으로 감싸는 형태
 >   >   > 데이터를 넣을 수 있고 for, if와 같은 구문도 사용가능  
 
+***  
+
+## 2.5 Django View, URL 알아보기  
+  
+### 2.5.1 Django View란  
+  
+> 뷰(View): 템플릿과 모델 사이를 이어주는 다리  
+>   > * 함수형 뷰  
+>   > * 클래스형 뷰  
+  
+### 2.5.2 Django URL이란  
+
+> URL(Uniform Resource Locator): 라우팅의 역할과 동시에 서버로 해당 주소에 할당된 리소스를 요청  
+
+***
+
+## 2.6 서비스 기능 하나씩 구현하기  
+  
+### 2.6.1 사진 목록 화면 만들기  
+  
+**템플릿: photo/templates/photo/photo_list.html**  
+```html
+<html>
+    <head>
+        <title>Photo App</title>
+    </head>
+    <body>
+        <h1><a href="">사진 목록 페이지</a></h1>
+        <section>
+            <div>
+                <h2>
+                    <a href="">화난 준우</a>
+                </h2>
+                <img
+                    src="https://w7.pngwing.com/pngs/92/998/png-transparent-anger-scalable-graphics-angry-face-pics-love-smiley-anger.png"
+                    alt="화난준우"
+                    width="300"
+                />
+                <p>화난 준우, 1000원</p>
+            </div>
+            
+            <div>
+                <h2>
+                    <a href="">화난 준우 2</a>
+                </h2>
+                <img
+                    src="https://png.pngtree.com/png-vector/20190114/ourlarge/pngtree-vector-angry-emoticon-icon-png-image_313017.jpg"
+                    alt="화난준우"
+                    width="300" 
+                />
+                <p>화난 준우, 1000원</p>
+            </div>
+        </section>
+    </body>
+</html>
+```
+
+**뷰: photo/views.py**
+```python
+from django.shortcuts import render
+
+# Create your views here.
+def photo_list(request):
+    return render(request, 'templates/photo/photo_list.html', {})
+```
+> templates를 경로에 포함시키면 오류가 발생함
+> templates는 default로 포함된다고 생각  
+> 따라서 아래와 같이 수정  
+**photo/views.py**
+```python
+from django.shortcuts import render
+
+# Create your views here.
+def photo_list(request):
+    return render(request, 'photo/photo_list.html', {})
+```
+
+
+**URL**
+* photo/urls.py
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.photo_list, name='photo_list'),
+]
+```
+* myweb/urls.py  
+```python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('photo.urls')),
+]
+```
+  
+**템플릿 태그: photo/templates/photo/photo_list.html**
+```html
+<html>
+    <head>
+        <title>Photo App</title>
+    </head>
+    <body>
+        <h1><a href="">사진 목록 페이지</a></h1>
+        <section>
+            {% for photo in photos %}
+            <div>
+                <h2>
+                    <a href="">{{ photo.title }}</a>
+                </h2>
+                <img src="{{ photo.image }}" alt="{{ photo.title }}" width="300" />
+                <p>{{ photo.author }}, {{ photo.price }}원</p>
+            </div>
+            {% endfor %}
+        </section>
+    </body>
+</html>
+```
+
+**뷰 수정: photo/views.py**
+```python
+from django.shortcuts import render
+from .models import Photo
+# Create your views here.
+def photo_list(request):
+    photos = Photo.objects.all()
+    return render(request, 'photo/photo_list.html', {'photos': photos})
+```
+> 뷰 마지막 인자의 {}을 활용해 템플릿으로 데이터 보내기 가능  
+> 그전에 모델에서 데이터를 꺼내와야 함 -> Django의 ORM(Object Relational Mapping)기능 사용  
+> Photo.objects.all()을 통해 Photo 모델 데이터를 가져옴  
+> 해당 데이터를 {}에 넣어서 템플릿으로 전달   
+> 템플릿은 해당 데이터를 템플릿 태그와 함께 활용  
+
+***
+***
+***
+# 개인적 수정
+> Image를 굳이 src로 받아야 하는가?
+> 파일로 올릴 수 있게 수정  
+
+
+**모델 수정: photo/models.py**
+```python
+from django.db import models
+
+# Create your models here.
+class Photo(models.Model):
+    title = models.CharField(max_length=50)
+    author = models.CharField(max_length=50)
+    image = models.ImageField(upload_to='static/images')
+    description = models.TextField()
+    price = models.IntegerField()
+```
+> image부분을 ImageField로 수정하고 upload 경로를 지정  
+
+**세팅 수정: myweb/settings.py**
+```python
+import os
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR,'static')] # 개발단계
+# STATIC_ROOT = os.path.join(BASE_DIR,'static') # 배포단계
+```
+
+> photo폴더 안에 static/images폴더 생성  
+> 그리고 서버실행  
+
+***
+***
+***
+
+
