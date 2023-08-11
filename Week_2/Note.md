@@ -396,4 +396,465 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR,'static')] # 개발단계
 ***
 ***
 
+## 2.6.2 사진 게시물 보기 화면 만들기  
 
+* 템플릿  
+**photo/templates/photo/photo_detail.html**
+```html
+<html>
+    <head>
+        <title>Photo App</title>
+    </head>
+    <body>
+        <h1>{{ photo.title }}</h1>
+        <section>
+            <div>
+                <img src="{{ photo.image.url }}" alt="{{ photo.title }}" width="300" />
+                <p>{{ photo.description }}</p>
+                <p>{{ photo.author }}, {{ photo.price }}원</p>
+            </div>
+        </section>
+    </body>
+</html>
+```
+
+* 뷰
+**photo/views.py**
+```python
+from django.shortcuts import render, get_object_or_404
+from .models import Photo
+
+# Create your views here.
+def photo_list(request):
+    photos = Photo.objects.all()
+    return render(request, 'photo/photo_list.html', {'photos': photos})
+
+def photo_detail(request, pk):
+    photo = get_object_or_404(Photo, pk=pk)
+    return render(request, 'photo/photo_detail.html', {'photo': photo})
+```
+> get_object_or_404()는 모델로부터 데이터를 찾아보고 없다면 404 에러를 반환  
+> pk(모델의 데이터를 구분하는 Django의 기본 ID값)로 데이터를 찾음  
+> 찾은 photo data를 photo_detail.html에 전달  
+
+* URL  
+**photo/urls.py**
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.photo_list, name='photo_list'),
+    path('photo/<int:pk>/', views.photo_detail, name='photo_detail'),
+]
+```
+> pk로 데이터를 유일하게 구분해 URL을 추가  
+
+**photo/templates/photo/photo_list.html**
+```html
+<html>
+    <head>
+        <title>Photo App</title>
+    </head>
+    <body>
+        <h1><a href="">사진 목록 페이지</a></h1>
+        <section>
+            {% for photo in photos %}
+            <div>
+                <h2>
+                    <a href="{% url 'photo_detail' pk=photo.pk %}">{{ photo.title }}</a>
+                </h2>
+                <img src="{{ photo.image.url }}" alt="{{ photo.title }}" width="300" />
+                <p>{{ photo.author }}, {{ photo.price }}원</p>
+            </div>
+            {% endfor %}
+        </section>
+    </body>
+</html>
+```
+> 메인화면에서 세부화면으로 이동할 수 있게 photo_detail.html의 URL에 대한 뷰를 설정  
+
+## 2.6.3 사진 게시물 작성 기능 만들기  
+
+* 템플릿  
+**photo/templates/photo/photo_post.html**
+```html
+<html>
+    <head>
+        <title>Photo App</title>
+    </head>
+    <body>
+        <h1><a href="/">홈으로 돌아가기</a></h1>
+        
+        <section>
+            <h2>New Photo</h2>
+            <form method="POST">
+                {% csrf_token %} {{ form.as_p }}
+                <button type="submit">완료!</button>
+            </form>
+        </section>
+    </body>
+</html>
+```
+> form은 사용자가 데이터를 입력한 것을 서버로 보내도록 도와주는 역할  
+> csrf_token은 보안 토큰: 사용자의 세션에 있는 토큰과 요청으로 돌아온 토큰이 일치하는지 확인하는 것  
+> form.as_p는 우리가 만들 form을 태그 형식으로 만들어주겠다는 것  
+
+* 폼  
+**photo/forms.py**
+```python
+from django import forms
+from .models import Photo
+
+class PhotoForm(forms.ModelForm):
+    class Meta:
+        model = Photo
+        fields = (
+            'title',
+            'author',
+            'image',
+            'description',
+            'price',
+        )
+```
+> django의 기본 ModelForm을 상속받아 fields의 필드 값들을 입력으로 받는 폼을 만듦  
+
+* 뷰
+**photo/views.py**
+```python
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import Photo
+from .forms import PhotoForm
+
+# Create your views here.
+def photo_list(request):
+    photos = Photo.objects.all()
+    return render(request, 'photo/photo_list.html', {'photos': photos})
+
+def photo_detail(request, pk):
+    photo = get_object_or_404(Photo, pk=pk)
+    return render(request, 'photo/photo_detail.html', {'photo': photo})
+
+def photo_post(request):
+    if request.method == "POST":
+        form = PhotoForm(request.POST)
+        if form.is_valid():
+            photo = form.save(commit=False)
+            photo.save()
+            return redirect('photo_detail', pk=photo.pk)
+    else:
+        form = PhotoForm()
+    return render(request, 'photo/photo_post.html', {'form': form})
+```
+
+> redirect: 다시 다른 페이지로 이동시켜주는 함수  
+> 조건문으로 들어온 요청이 POST인지 확인(일반적으로 웹 브라우저에서 페이지로 접속하는 요청은 GET요청임)  
+> 요청으로 들어온 폼 데이터를 form이라는 변수에 받아와 폼에 맞춰 잘 작성된 데이터인지 검사(Django에서 제공하는 기능)  
+> valid하다면 photo라는 변수에 form에서 받은 데이터를 받아 photo.save()로 저장  
+> 그리고 해당 게시글의 세부 페이지로 이동  
+> POST요청이 아니라면 해당 페이지에 처음 접속일테니 form을 제공  
+> form이 valid하지 않거나 POST요청이 아닐 때, render로 가게 되어 빈 폼 페이지를 보여줌  
+
+* URL  
+**photo/urls.py**
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.photo_list, name='photo_list'),
+    path('photo/<int:pk>/', views.photo_detail, name='photo_detail'),
+    path('photo/new/', views.photo_post, name='photo_post'),
+]
+```
+
+**photo/templates/photo/photo_list.html**
+```html
+<html>
+    <head>
+        <title>Photo App</title>
+    </head>
+    <body>
+        <h1><a href="">사진 목록 페이지</a></h1>
+        <h3><a href="{% url 'photo_post' %}">New Photo</a></h3>
+        <section>
+            {% for photo in photos %}
+            <div>
+                <h2>
+                    <a href="{% url 'photo_detail' pk=photo.pk %}">{{ photo.title }}</a>
+                </h2>
+                <img src="{{ photo.image.url }}" alt="{{ photo.title }}" width="300" />
+                <p>{{ photo.author }}, {{ photo.price }}원</p>
+            </div>
+            {% endfor %}
+        </section>
+    </body>
+</html>
+```
+
+**위와 같이 했더니! 사진 업로드가 안되고 오류가 떠버림!**
+
+***
+***
+***
+
+## 책은 생각보다 불친절하다, 구글링을 통해 내 방식대로 해봤다
+
+**photo/models.py**
+```python
+from django.db import models
+
+# Create your models here.
+class Photo(models.Model):
+    title = models.CharField(blank = True, max_length=50)
+    author = models.CharField(blank = True, max_length=50)
+    image = models.ImageField(blank = True, null = True, upload_to='static/images')
+    description = models.TextField(blank = True)
+    price = models.IntegerField(blank = True)
+```
+> 공란도 입력받을 수 있게 blank=True속성을 줌  
+> ImageField에서 문제가 발생한 것 같음  
+
+**photo/views.py**
+```python
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import Photo
+from .forms import PhotoForm
+
+# Create your views here.
+def photo_list(request):
+    photos = Photo.objects.all()
+    return render(request, 'photo/photo_list.html', {'photos': photos})
+
+def photo_detail(request, pk):
+    photo = get_object_or_404(Photo, pk=pk)
+    return render(request, 'photo/photo_detail.html', {'photo': photo})
+
+def photo_post(request):
+    if request.method == 'POST':
+        form = PhotoForm(request.POST, request.FILES)
+        if form.is_valid():
+            photo = Photo(
+                title=request.POST['title'],
+                author=request.POST['author'],
+                image=request.FILES['image'],
+                description=request.POST['description'],
+                price=request.POST['price']
+                )
+            photo.save()
+            return redirect('photo_detail', pk=photo.pk)
+    else:
+        form = PhotoForm()
+    return render(request, 'photo/photo_post.html', {'form': form})
+```
+
+> 가장 중요한 부분..
+> photo_post 함수에서 request.POST와 request.FILES를 통해 데이터를 받아옴  
+> request.POST에는 title, author, description, price가 있음  
+> request.FILES에는 image가 있음  
+> 데이터베이스에 photo.save()를 통해 저장하고 redirect  
+
+
+**photo/templates/photo/photo_post.html**
+```html
+<html>
+    <head>
+        <title>Photo App</title>
+    </head>
+    <body>
+        <h1><a href="/">홈으로 돌아가기</a></h1>
+        
+        <section>
+            <div>
+                <h2>New Photo</h2>
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %} {{ form.as_p }}
+                    <button type="submit">완료!</button>
+                </form>
+            </div>
+        </section>
+    </body>
+</html>
+```
+> 파일이 포함된 form을 제출한다는 multipart/form-data로 인코딩 타입 명시  
+
+
+**위의 과정을 통해 오류를 해결함!**
+***
+***
+***
+
+## 2.6.4 사진 게시물 수정 기능 만들기  
+
+* 템플릿
+> 작성 기능과 템플릿이 동일해 기존 photo_post.html 이용  
+
+* 뷰  
+**photo/views.py**
+```python
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import Photo
+from .forms import PhotoForm
+
+# Create your views here.
+def photo_list(request):
+    photos = Photo.objects.all()
+    return render(request, 'photo/photo_list.html', {'photos': photos})
+
+def photo_detail(request, pk):
+    photo = get_object_or_404(Photo, pk=pk)
+    return render(request, 'photo/photo_detail.html', {'photo': photo})
+
+def photo_post(request):
+    if request.method == 'POST':
+        form = PhotoForm(request.POST, request.FILES)
+        if form.is_valid():
+            photo = Photo(
+                title=request.POST['title'],
+                author=request.POST['author'],
+                image=request.FILES['image'],
+                description=request.POST['description'],
+                price=request.POST['price']
+                )
+            photo.save()
+            return redirect('photo_detail', pk=photo.pk)
+    else:
+        form = PhotoForm()
+    return render(request, 'photo/photo_post.html', {'form': form})
+    
+def photo_edit(request, pk):
+    photo = get_object_or_404(Photo, pk=pk)
+    if request.method == 'POST':
+        form = PhotoForm(request.POST, request.FILES, instance=photo)
+        if form.is_valid():
+            photo = Photo(
+                title=request.POST['title'],
+                author=request.POST['author'],
+                image=request.FILES['image'],
+                description=request.POST['description'],
+                price=request.POST['price']
+            )
+            photo.save()
+            return redirect('photo_detail', pk=photo.pk)
+    else:
+        form = PhotoForm(instance=photo)
+    return render(request, 'photo/photo_post.html', {'form': form})
+```
+
+> 먼저 수정할 대상을 pk로 찾아옴  
+> 작성 때와 다른 것은 동일하고 PhotoForm의 instance를 photo로 설정해 수정 대상이 될 데이터를 설정함  
+> GET 요청이 들어와도 photo데이터를 폼에 담아 photo_post.html에 넘겨 기존 데이터를 수정  
+
+* URL
+**photo/urls.py**
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.photo_list, name='photo_list'),
+    path('photo/<int:pk>/', views.photo_detail, name='photo_detail'),
+    path('photo/new/', views.photo_post, name='photo_post'),
+    path('photo/<int:pk>/edit/', views.photo_edit, name='photo_edit'),
+]
+```
+
+> pk를 URL에 넣어 구분  
+
+**photo/templates/photo/photo_detail.html**
+```html
+<html>
+    <head>
+        <title>Photo App</title>
+    </head>
+    <body>
+        <h1>{{ photo.title }}</h1>
+        <h3><a href="{% url 'photo_edit' pk=photo.pk %}">Edit Photo</a></h3>
+        <section>
+            <div>
+                <img src="{{ photo.image.url }}" alt="{{ photo.title }}" width="300" />
+                <p>{{ photo.description }}</p>
+                <p>{{ photo.author }}, {{ photo.price }}원</p>
+            </div>
+        </section>
+    </body>
+</html>
+```
+
+> 수정하는 링크를 photo_detail 페이지에 추가  
+
+## 2.6.5 예시 마무리 하기  
+
+> 끝
+
+***
+***
+***
+
+> 인줄 알았지만... 역시나 수정이 안되고 추가가 되버리는 문제...  
+
+## 구글링을 통한.. static/images 경로에 있는 사진 삭제와 추가 기능 추가  
+
+**photo/views.py**
+```python
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import Photo
+from .forms import PhotoForm
+import os
+# Create your views here.
+def photo_list(request):
+    photos = Photo.objects.all()
+    return render(request, 'photo/photo_list.html', {'photos': photos})
+
+def photo_detail(request, pk):
+    photo = get_object_or_404(Photo, pk=pk)
+    return render(request, 'photo/photo_detail.html', {'photo': photo})
+
+def photo_post(request):
+    if request.method == 'POST':
+        form = PhotoForm(request.POST, request.FILES)
+        if form.is_valid():
+            photo = Photo(
+                title=request.POST['title'],
+                author=request.POST['author'],
+                image=request.FILES['image'],
+                description=request.POST['description'],
+                price=request.POST['price']
+                )
+            photo.save()
+            return redirect('photo_detail', pk=photo.pk)
+    else:
+        form = PhotoForm()
+    return render(request, 'photo/photo_post.html', {'form': form})
+    
+def photo_edit(request, pk):
+    photo = get_object_or_404(Photo, pk=pk)
+    if request.method == 'POST':
+        form = PhotoForm(request.POST, request.FILES, instance=photo)
+        old_img = photo.image.path
+        if form.is_valid():
+            # 기존 이미지 파일 삭제
+            if os.path.exists(old_img):
+                os.remove(old_img)
+            # 새로운 이미지 파일 등록
+            form.save()
+            return redirect('photo_detail', pk=photo.pk)
+    else:
+        form = PhotoForm(instance=photo)
+    return render(request, 'photo/photo_post.html', {'form': form})
+```
+
+> import os를 해서 경로를 찾을 수 있게 해줌  
+> photo_edit 부분에 기존 객체를 받고 이미지 경로 변수에 저장  
+> os.path.exists에 인자로 기존 객체의 이미지 경로를 넘겨주고 경로가 실제로 존재하는지 확인  
+> 존재한다면 os.remove로 삭제  
+> PhotoForm에 맞게 받아온 form을 그대로 데이터베이스에 저장  
+> 나머지는 똑같음  
+>   > 사실 왜 되지? 하는 부분이 조금 있었지만 일단 되기에 패스.. 시간을 너무 많이 써버림  
+
+
+**진짜 끝**
+
+***
+***
+***
