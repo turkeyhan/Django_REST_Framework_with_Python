@@ -225,3 +225,274 @@ urlpatterns = [
 ***
 ***
 
+# 3.3 Todo 상세 조회 기능 만들기  
+
+***
+
+## 3.3.1 Todo 상세 조회 기능 컨셉  
+
+> Todo를 선택했을 때, 조회할 수 있는 기능
+> Todo를 선택하면 Todo의 제목과 설명을 나타냄  
+
+## 3.3.2 Todo 상세 조회 템플릿 만들기  
+
+**템플릿: todo/templates/todo/todo_detail.html**
+```html
+<html>
+    <head>
+        <title>TODO 목록 앱</title>
+        <link
+        rel = "stylesheet"
+        href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/boot-strap-icons.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>TODO 상세보기</h1>
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ todo.title }}</h5>
+                                <p class="card-text">{{ todo.description }}</p>
+                                <a href="{% url 'todo_list' %}" class="btn btn-primary">목록으로</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
+```
+
+> Bootstrap을 사용해 스타일을 적용  
+> Todo 제목과 설명을 보여줌  
+> 목록으로 다시 돌아갈 수 있는 버튼까지 만듦  
+
+## 3.3.3 Todo 상세 조회 뷰 만들기  
+
+**뷰: todo/views.py**
+```python
+from django.shortcuts import render, redirect
+from .models import Todo
+
+# Create your views here.
+def todo_list(request):
+    todos = Todo.objects.filter(complete=False)
+    return render(request, 'todo/todo_list.html', {'todos': todos})
+
+def todo_detail(request, pk):
+    todo = Todo.objects.get(id=pk)
+    return render(request, 'todo/todo_detail.html', {'todo': todo})
+```
+> Todo의 pk인 id를 기반으로 Todo 객체를 찾아 todo_detail.html로 전달  
+
+**todo/templates/todo/todo_list.html**
+```html
+<html>
+    <head>
+        <title>TODO 목록 앱</title>
+        <link
+        rel = "stylesheet"
+        href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/boot-strap-icons.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>TODO 목록 앱</h1>
+            <p>
+                <a href=""><i class="bi-plus"></i>Add Todo</a>
+                <a href="" class="btn btn-primary" style="float:right">완료한 TODO 목록</a>
+            </p>
+            <ul class="list-group">
+                {% for todo in todos %}
+                <li class="list-group-item">
+                    <a href="{% url 'todo_detail' pk=todo.pk %}">{{ todo.title }}</a>
+                    {% if todo.important %}
+                        <span class="badge badge-danger">!</span>
+                    {% endif %}
+                    <div style="float:right">
+                        <a href="" class="btn btn-danger">완료</a>
+                        <a href="" class="btn btn-outline-primary">수정하기</a>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </body>
+</html>
+```
+
+> todo_list.html의 버튼에 링크를 넣음  
+
+## 3.3.4 Todo 상세 조회 URL 연결하기  
+
+**URL: todo/urls.py**
+```python
+from django.urls import path
+from . import views
+# Register your models here.
+
+urlpatterns = [
+    path('', views.todo_list, name='todo_list'),
+    path('<int:pk>/', views.todo_detail, name='todo_detail'),
+]
+```
+> url을 /pk/로 설정해 선택한 Todo를 연결할 수 있도록 설정  
+
+***
+***
+***
+
+# 3.4 Todo 생성 기능 만들기  
+
+***
+
+## 3.4.1 Todo 생성 기능 컨셉  
+
+> Todo 생성은 제목, 설명, 중요도를 입력해야 하기 때문에 입력 폼이 필요함  
+> todo/forms.py를 활용할 예정  
+
+## 3.4.2 Todo 생성 템플릿 만들기  
+
+**todo/forms.py**
+```python
+from django import forms
+from .models import Todo
+
+class TodoForm(forms.ModelForm):
+    class Meta:
+        model = Todo
+        fields = ('title', 'description', 'important')
+```
+
+> 폼을 활용해 템플릿 작성  
+> 위 폼을 form.as_p의 형태로 작성하면 태그 꼴로 템플릿에 폼이 생성  
+
+**todo/templates/todo/todo_post.html**
+```html
+<html>
+    <head>
+        <title>TODO 목록 앱</title>
+        <link
+        rel = "stylesheet"
+        href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/boot-strap-icons.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>TODO 추가하기</h1>
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-body">
+                               <form method="POST">
+                                {% csrf_token %} {{ form.as_p }}
+                                <button type="submit" class="btn btn-primary">등록</button>
+                               </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
+```
+
+## 3.4.3 Todo 생성 뷰 만들기  
+
+**뷰: todo/views.py**
+```python
+from django.shortcuts import render, redirect
+from .models import Todo
+from .forms import TodoForm
+
+# Create your views here.
+def todo_list(request):
+    todos = Todo.objects.filter(complete=False)
+    return render(request, 'todo/todo_list.html', {'todos': todos})
+
+def todo_detail(request, pk):
+    todo = Todo.objects.get(id=pk)
+    return render(request, 'todo/todo_detail.html', {'todo': todo})
+
+def todo_post(request):
+    if request.method == "POST":
+        form = TodoForm(request.POST)
+        if form.is_valid():
+            todo = form.save(commit=False)
+            todo.save()
+            return redirect('todo_list')
+    else:
+        form = TodoForm()
+    return render(request, 'todo/todo_post.html', {'form': form})    
+```
+> POST요청이 들어왔는지 확인하고 폼도 검증함  
+> GET요청이거나 폼이 유효하지 않으면 폼 템플릿 페이지를 보여줌  
+
+**todo/templates/todo/todo_list.html**
+```html
+<html>
+    <head>
+        <title>TODO 목록 앱</title>
+        <link
+        rel = "stylesheet"
+        href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/boot-strap-icons.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>TODO 목록 앱</h1>
+            <p>
+                <a href="{% url 'todo_post' %}"><i class="bi-plus"></i>Add Todo</a>
+                <a href="" class="btn btn-primary" style="float:right">완료한 TODO 목록</a>
+            </p>
+            <ul class="list-group">
+                {% for todo in todos %}
+                <li class="list-group-item">
+                    <a href="{% url 'todo_detail' pk=todo.pk %}">{{ todo.title }}</a>
+                    {% if todo.important %}
+                        <span class="badge badge-danger">!</span>
+                    {% endif %}
+                    <div style="float:right">
+                        <a href="" class="btn btn-danger">완료</a>
+                        <a href="" class="btn btn-outline-primary">수정하기</a>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </body>
+</html>
+```
+
+> todo_list.html의 버튼에 링크 추가  
+
+## 3.4.4 Todo 생성 URL 연결하기  
+
+**URL: todo/urls.py**
+```python
+from django.urls import path
+from . import views
+# Register your models here.
+
+urlpatterns = [
+    path('', views.todo_list, name='todo_list'),
+    path('<int:pk>/', views.todo_detail, name='todo_detail'),
+    path('post/', views.todo_post, name='todo_post'),
+]
+```
+> url을 post/로 지정해 url 연결  
+
+***
+***
+***
+

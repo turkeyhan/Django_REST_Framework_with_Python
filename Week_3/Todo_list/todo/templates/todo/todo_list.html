@@ -11,13 +11,13 @@
         <div class="container">
             <h1>TODO 목록 앱</h1>
             <p>
-                <a href=""><i class="bi-plus"></i>Add Todo</a>
+                <a href="{% url 'todo_post' %}"><i class="bi-plus"></i>Add Todo</a>
                 <a href="" class="btn btn-primary" style="float:right">완료한 TODO 목록</a>
             </p>
             <ul class="list-group">
                 {% for todo in todos %}
                 <li class="list-group-item">
-                    <a href="">{{ todo.title }}</a>
+                    <a href="{% url 'todo_detail' pk=todo.pk %}">{{ todo.title }}</a>
                     {% if todo.important %}
                         <span class="badge badge-danger">!</span>
                     {% endif %}
