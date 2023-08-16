@@ -496,3 +496,287 @@ urlpatterns = [
 ***
 ***
 
+# 3.5 Todo 수정 기능 만들기  
+
+***
+
+## 3.5.1 Todo 수정 기능 컨셉  
+> 생성 기능과 거의 동일  
+> 차이점은 폼에 이미 데이터가 입력되어 있다는 것  
+
+## 3.5.2 Todo 수정 뷰 만들기  
+
+**뷰: todo/views.py**
+```python
+def todo_edit(request, pk):
+    todo = Todo.objects.get(id = pk)
+    if request.method == "POST":
+        form = TodoForm(request.POST, instance=todo)
+        if form.is_valid():
+            todo = form.save(commit=False)
+            todo.save()
+            return redirect('todo_list')
+    else:
+        form = TodoForm(instance=todo)
+    return render(request, 'todo/todo_post.html', {'form': form})
+```
+> 기존 Todo 데이터를 form에 전달하고 수정한 것 템플릿으로 전달  
+> objects.get()을 통해 id로 구분하여 기존 값 받아옴  
+> instance를 통해 폼에 객체를 전달  
+
+**todo/templates/todo/todo_list.html**
+```html
+<html>
+    <head>
+        <title>TODO 목록 앱</title>
+        <link
+        rel = "stylesheet"
+        href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/boot-strap-icons.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>TODO 목록 앱</h1>
+            <p>
+                <a href="{% url 'todo_post' %}"><i class="bi-plus"></i>Add Todo</a>
+                <a href="" class="btn btn-primary" style="float:right">완료한 TODO 목록</a>
+            </p>
+            <ul class="list-group">
+                {% for todo in todos %}
+                <li class="list-group-item">
+                    <a href="{% url 'todo_detail' pk=todo.pk %}">{{ todo.title }}</a>
+                    {% if todo.important %}
+                        <span class="badge badge-danger">!</span>
+                    {% endif %}
+                    <div style="float:right">
+                        <a href="" class="btn btn-danger">완료</a>
+                        <a href="{% url 'todo_edit' pk=todo.pk %}" class="btn btn-outline-primary">수정하기</a>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </body>
+</html>
+```
+> 수정 버튼에 링크 추가  
+
+## 3.5.3 Todo 수정 URL 연결하기  
+
+**todo/urls.py**
+```python
+from django.urls import path
+from . import views
+# Register your models here.
+
+urlpatterns = [
+    path('', views.todo_list, name='todo_list'),
+    path('<int:pk>/', views.todo_detail, name='todo_detail'),
+    path('post/', views.todo_post, name='todo_post'),
+    path('<int:pk>/edit/', views.todo_edit, name='todo_edit'),
+]
+```
+> /edit/형태로 url 연결  
+
+***
+***
+***
+
+# 3.6 Todo 완료 기능 만들기  
+
+***
+
+## 3.6.1 Todo 완료 기능 컨셉  
+
+> 완료 버튼을 눌렀을 때, Todo의 complete를 True로 설정해 주는 기능  
+> 완료 Todo 조회 기능은 완료된 Todo만 필터링해 보여주는 기능  
+
+## 3.6.2 Todo 완료 템플릿 만들기  
+
+**템플릿: todo/templates/todo/done_list.html**
+```html
+<html>
+    <head>
+        <title>TODO 목록 앱</title>
+        <link
+        rel = "stylesheet"
+        href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/boot-strap-icons.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>DONE 목록</h1>
+            <p>
+                <a href="{% url 'todo_list' %}" class="btn btn-primary">홈으로</a>
+            </p>
+            <ul class="list-group">
+                {% for done in dones %}
+                <li class="list-group-item">
+                    <a href="{% url 'todo_detail' pk=done.pk %}">{{ done.title }}</a>
+                    {% if done.important %}
+                        <span class="badge badge-danger">!</span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </body>
+</html>
+```
+
+**todo/templates/todo/todo_list.html**
+```html
+<html>
+    <head>
+        <title>TODO 목록 앱</title>
+        <link
+        rel = "stylesheet"
+        href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/boot-strap-icons.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>TODO 목록 앱</h1>
+            <p>
+                <a href="{% url 'todo_post' %}"><i class="bi-plus"></i>Add Todo</a>
+                <a href="{% url 'done_list' %}" class="btn btn-primary" style="float:right">완료한 TODO 목록</a>
+            </p>
+            <ul class="list-group">
+                {% for todo in todos %}
+                <li class="list-group-item">
+                    <a href="{% url 'todo_detail' pk=todo.pk %}">{{ todo.title }}</a>
+                    {% if todo.important %}
+                        <span class="badge badge-danger">!</span>
+                    {% endif %}
+                    <div style="float:right">
+                        <a href="" class="btn btn-danger">완료</a>
+                        <a href="{% url 'todo_edit' pk=todo.pk %}" class="btn btn-outline-primary">수정하기</a>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </body>
+</html>
+```
+
+> todo_list.html의 버튼에 링크 추가  
+
+## 3.6.3 Todo 완료 뷰 만들기  
+
+> 완료된 목록을 보여주는 기능  
+> Todo를 완료로 바꿔주는 기능  
+
+**todo/views.py**
+```python
+from django.shortcuts import render, redirect
+from .models import Todo
+from .forms import TodoForm
+
+# Create your views here.
+def todo_list(request):
+    todos = Todo.objects.filter(complete=False)
+    return render(request, 'todo/todo_list.html', {'todos': todos})
+
+def todo_detail(request, pk):
+    todo = Todo.objects.get(id=pk)
+    return render(request, 'todo/todo_detail.html', {'todo': todo})
+
+def todo_post(request):
+    if request.method == "POST":
+        form = TodoForm(request.POST)
+        if form.is_valid():
+            todo = form.save(commit=False)
+            todo.save()
+            return redirect('todo_list')
+    else:
+        form = TodoForm()
+    return render(request, 'todo/todo_post.html', {'form': form})    
+
+def todo_edit(request, pk):
+    todo = Todo.objects.get(id = pk)
+    if request.method == "POST":
+        form = TodoForm(request.POST, instance=todo)
+        if form.is_valid():
+            todo = form.save(commit=False)
+            todo.save()
+            return redirect('todo_list')
+    else:
+        form = TodoForm(instance=todo)
+    return render(request, 'todo/todo_post.html', {'form': form})
+
+def done_list(request):
+    dones = Todo.objects.filter(complete=True)
+    return render(request, 'todo/done_list.html', {'dones': dones})
+
+def todo_done(request, pk):
+    todo = Todo.objects.get(id=pk)
+    todo.complete = True
+    todo.save()
+    return redirect('todo_list')
+```
+
+**todo/templates/todo/todo_list.html**
+```html
+<html>
+    <head>
+        <title>TODO 목록 앱</title>
+        <link
+        rel = "stylesheet"
+        href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/boot-strap-icons.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>TODO 목록 앱</h1>
+            <p>
+                <a href="{% url 'todo_post' %}"><i class="bi-plus"></i>Add Todo</a>
+                <a href="{% url 'done_list' %}" class="btn btn-primary" style="float:right">완료한 TODO 목록</a>
+            </p>
+            <ul class="list-group">
+                {% for todo in todos %}
+                <li class="list-group-item">
+                    <a href="{% url 'todo_detail' pk=todo.pk %}">{{ todo.title }}</a>
+                    {% if todo.important %}
+                        <span class="badge badge-danger">!</span>
+                    {% endif %}
+                    <div style="float:right">
+                        <a href="{% url 'todo_done' pk=todo.pk %}" class="btn btn-danger">완료</a>
+                        <a href="{% url 'todo_edit' pk=todo.pk %}" class="btn btn-outline-primary">수정하기</a>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </body>
+</html>
+```
+
+## 3.6.4 Todo 완료 URL 연결하기  
+
+**todo/urls.py**
+```python
+from django.urls import path
+from . import views
+# Register your models here.
+
+urlpatterns = [
+    path('', views.todo_list, name='todo_list'),
+    path('<int:pk>/', views.todo_detail, name='todo_detail'),
+    path('post/', views.todo_post, name='todo_post'),
+    path('<int:pk>/edit/', views.todo_edit, name='todo_edit'),
+    path('done/', views.done_list, name='done_list'),
+    path('done/<int:pk>', views.todo_done, name='todo_done'),
+]
+```
+
+***
+***
+***
+
+**책에.. views.py 마지막 부분이 잘못나왔고.. 그냥 중간에 코드가 잘못나온게 좀 많다**  
+**무작정 따라하기보다 잘 보면서 맞는지 확인하고 이해하며 보기**
