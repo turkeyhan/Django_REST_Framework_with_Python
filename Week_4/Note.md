@@ -169,3 +169,274 @@ urlpatterns = [
 ***
 ***
 
+## 4.3 도서 정보 API 예제로 Django REST Framework 기초 개념 살펴보기  
+
+***
+
+### 4.3.1 DRF Serializer  
+
+> * Serialize: 직렬화, Django 프로젝트에서 만든 모델로부터 뽑은 queryset(Model instance or 파이썬 데이터 객체)을 JSON으로 바꾸는 것
+>   > DRF 서버가 데이터를 클라이언트에 보낼 때, API가 직렬화의 과정을 해줌    
+> * Deserialize: 역직렬화, JSON 등의 문자열을 파이썬 데이터 객체로 바꾸는 것  
+>   > 클라이언트가 데이터를 DRF 서버에 보낼 때, API가 역직렬화의 과정을 해줌  
+
+**Serializer는 직렬화와 역직렬화 기능을 동시에 갖고 있음**  
+**클라이언트와 서버 API 간 데이터 양식을 맞춰주는 변환기**  
+
+> **모델: example/models.py**
+```python
+from django.db import models
+
+# Create your models here.
+class Book(models.Model):
+    bid = models.IntegerField(primary_key=True)
+    title = models.CharField(max_length=50)
+    author = models.CharField(max_length=50)
+    category = models.CharField(max_length=50)
+    pages = models.IntegerField()
+    price = models.IntegerField()
+    published_date = models.DateField()
+    description = models.TextField()
+```
+
+```bash
+$ python manage.py makemigrations example
+$ python manage.py migrate
+```
+
+> **시리얼라이저: example/serializers.py**
+```python
+from rest_framework import serializers
+from .models import Book
+
+class BookSerializer(serializers.Serializer):
+    bid = serializers.IntegerField(primary_key=True)
+    title = serializers.CharField(max_length=50)
+    author = serializers.CharField(max_length=50)
+    category = serializers.CharField(max_length=50)
+    pages = serializers.IntegerField()
+    price = serializers.IntegerField()
+    published_date = serializers.DateField()
+    description = serializers.TextField()
+
+    def create(self, validated_data):
+        return Book.objects.create(**validated_data)
+    def update(self, instance, validated_data):
+        instance.bid = validated_data.get('bid', instance.bid)
+        instance.title = validated_data.get('title', instance.title)
+        instance.author = validated_data.get('author', instance.author)
+        instance.category = validated_data.get('category', instance.category)
+        instance.pages = validated_data.get('pages', instance.pages)
+        instance.price = validated_data.get('price', instance.price)
+        instance.published_date = validated_data.get('published_date', instance.published_date)
+        instance.description = validated_data.get('description', instance.description)
+        instance.save()
+
+        return instance
+```
+
+> 모델 데이터의 어떤 속성을 JSON에 넣어줄지 선언(필드 선언)  
+> create()나 update()는 POST 요청으로 들어온 데이터를 파이썬 모델 형태로 역직렬화하여 데이터베이스에 집어넣을 때, 사용함  
+> 같은 내용이 반복되고 코드가 긺  
+> 따라서 더 나은 대안인 serializers.ModelSerializer 사용  
+
+> **example/serializers.py**
+```python
+from rest_framework import serializers
+from .models import Book
+
+class BookSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Book
+        fields = ['bid', 'title', 'author', 'category', 'pages', 'price', 'published_date', 'description']
+```
+
+> 모델의 내용을 기반으로 동작하며 위에서 적은 코드와 내용은 같음  
+
+### 4.3.2 DRF FBV, CBV, API View  
+
+> **두 가지 유형의 뷰 개발방법**
+> * Function Based View(FBV): 함수 기반 뷰  
+> * Class Based View(CBV): 클래스 기반 뷰  
+> 뷰 작성을 함수로 했는지 클래스로 했는지의 차이일 뿐, 기능 상 차이는 없음  
+
+> **APIView**: 여러 가지 요청의 유형에 대해 동작할 수 있도록 도와줌  
+>   > 함수형 뷰에서는 @api_view와 같이 데코레이터 형태로 사용  
+**example/views.py**
+```python
+from rest_framework import viewsets, permissions, generics, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view
+
+@api_view(['GET'])
+def HelloAPI(request):
+    return Response("hello world!")
+```
+  
+>   > 클래스형 뷰에서는 APIView라는 클래스를 상속받는 클래스의 형태로 생성  
+```python
+from rest_framework import viewsets, permissions, generics, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view
+
+class HelloAPI(APIView):
+    def get(self, request):
+        return Response("hello world")
+```
+
+> **함수형 뷰: example/views.py**
+```python
+from rest_framework import viewsets, permissions, generics, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view
+from rest_framework.generics import get_object_or_404
+from .models import Book
+from .serializers import BookSerializer
+
+@api_view(['GET'])
+def HelloAPI(request):
+    return Response("hello world!")
+
+@api_view(['GET', 'POST'])
+def booksAPI(request):
+    if request.method == 'GET':
+        books = Book.objects.all()
+        serializer = BookSerializer(books, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    elif request.method == 'POST':
+        serializer = BookSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+def bookAPI(request, bid):
+    book = get_object_or_404(Book, bid=bid)
+    serializer = BookSerializer(book)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+```
+
+> **클래스형 뷰**
+```python
+from rest_framework import viewsets, permissions, generics, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view
+from rest_framework.generics import get_object_or_404
+from .models import Book
+from .serializers import BookSerializer
+
+class BooksAPI(APIView):
+    def get(self, request):
+        books = Book.objects.all()
+        serializer = BookSerializer(books, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    def post(self, request):
+        serializer = BookSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class BookAPI(APIView):
+    def get(self, request, bid):
+        book = get_object_or_404(Book, bid=bid)
+        serializer = BookSerializer(book)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+```
+
+**Saying that class-based views is always the superior solution is a mistake. Nick Coghlan**  
+**클래스형 뷰의 여러 부가 기능을 보면 함수형 뷰보다 훨씬 성능이 좋을 것 같지만 절대적인 해결책은 아님**  
+
+### 4.3.3 도서 정보 API 마무리 하기  
+
+***
+***
+
+**함수형 뷰**  
+
+> **URL: example/urls.py**
+```python
+from django.urls import path, include
+from .views import HelloAPI, bookAPI, booksAPI
+
+urlpatterns = [
+    path("hello/", HelloAPI),
+    path("fbv/books/", booksAPI),
+    path("fbv/book/<int:bid>/", bookAPI),
+]
+```
+> **실행 후 127.0.0.1:8000/example/fbv/books/로 접속**
+```bash
+$ python manage.py runserver
+```
+
+> **content란에 JSON 형식의 데이터 입력 후 POST** 
+```json
+{
+"bid": 9788931466195,
+"title": "백엔드를 위한 Django REST Framework with 파이썬",
+"author": "권태형",
+"category": "프로그래밍",
+"pages": 248,
+"price": 18000,
+"published_date": "2022-05-20",
+"description": "MTV 패턴으로 만드는 REST API"
+}
+```
+
+> **http://127.0.0.1:8000/example/fbv/book/9788931466195/로 접속**  
+
+***
+***
+
+**클래스형 뷰**  
+
+> **URL: example/urls.py**
+```python
+from django.urls import path, include
+from .views import HelloAPI, bookAPI, booksAPI, BookAPI, BooksAPI
+
+urlpatterns = [
+    path("hello/", HelloAPI),
+    path("fbv/books/", booksAPI),
+    path("fbv/book/<int:bid>/", bookAPI),
+    path("cbv/books/", BooksAPI.as_view()),
+    path("cbv/book/<int:bid>/", BookAPI.as_view()),
+]
+```
+
+> **실행 후 127.0.0.1:8000/example/cbv/books/로 접속**  
+
+> **content란에 JSON 형식의 데이터 입력 후 POST** 
+```json
+{
+"bid": 9788931467970,
+"title": "풀스택 개발이 쉬워지는 다트&플러터",
+"author": "이성원",
+"category": "프로그래밍",
+"pages": 720,
+"price": 40000,
+"published_date": "2023-05-15",
+"description": "시작하는 개발자를 위한 코딩 부트캠프"
+}
+```
+
+> **http://127.0.0.1:8000/example/fbv/book/9788931467970/로 접속**
+
+***
+***
+
+> **https://insomnia.rest/**  
+> 위 사이트에서 API 테스트를 위한 전용 프로그램 다운로드  
+> New request를 통해 http://127.0.0.1:8000/example/fbv/books/ 로 GET 요청 send  
+> POST 요청으로 새로운 데이터도 생성 가능  
+> Primary_key인 bid가 같을 시, 중복생성으로 데이터가 들어가지 않아서 400 오류가 뜸  
+
+***
+***
+
