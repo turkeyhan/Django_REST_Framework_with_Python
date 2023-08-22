@@ -440,3 +440,208 @@ urlpatterns = [
 ***
 ***
 
+## 4.4 Django REST Framework 심화 개념 보충하기  
+
+***
+
+## 4.4.1 DRF의 다양한 뷰  
+
+> **URL과 Method의 조합**  
+1. 도서 전체 목록 가져오기 (GET /books/), (list)  
+2. 도서 1권 정보 등록하기 (POST /books/), (create)  
+3. 도서 1권 정보 가져오기 (GET /book/1), (retrieve)  
+4. 도서 1권 정보 수정하기 (PUT /book/1), (update)  
+5. 도서 1권 정보 삭제하기 (DELETE /book/1), (destroy)  
+
+### 4.4.2 DRF mixins  
+
+> **클래스형 뷰에서 시리얼라이저 중복문제**
+> mixins는 APIView에서 request의 method마다 시리얼라이저 코드를 작성하는 것을 줄이기 위해 클래스 레벨에서 시리얼라이저를 등록함  
+> 따라서 각 method에는 시리얼라이저 코드를 작성하는 대신 mixin에 연결해 사용  
+
+  
+> **example/views.py**
+```python
+from rest_framework import generics
+from rest_framework import mixins
+from rest_framework import viewsets, permissions, generics, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view
+from rest_framework.generics import get_object_or_404
+from .models import Book
+from .serializers import BookSerializer
+
+class BooksAPIMixins(mixins.ListModelMixin, mixins.CreateModelMixin, generics.GenericAPIView):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+    def post(self, request, *args, **kwargs):
+        return self.create(request, *args, **kwargs)
+    
+class BookAPIMixins(mixins.RetrieveModelMixin, generics.GenericAPIView):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+    lookup_field = 'bid'
+
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+```
+
+> generics와 mixins를 불러와 각각 클라스를 만들 때, 상속함  
+> queryset에는 모든 데이터를 불러옴  
+> serializer_class로 사용할 시리얼라이저 설정  
+> 각 method에 대해 return문을 확인하면 Mixins에 해당되는 method에 알맞게 사용되어 있는 것을 알 수 있음  
+  
+> **update와 destroy 추가: example/views.py**  
+```python
+from rest_framework import generics
+from rest_framework import mixins
+from rest_framework import viewsets, permissions, generics, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view
+from rest_framework.generics import get_object_or_404
+from .models import Book
+from .serializers import BookSerializer
+
+class BooksAPIMixins(mixins.ListModelMixin, mixins.CreateModelMixin, generics.GenericAPIView):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+    def post(self, request, *args, **kwargs):
+        return self.create(request, *args, **kwargs)
+    
+class BookAPIMixins(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, generics.GenericAPIView):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+    lookup_field = 'bid'
+
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+    def put(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+```
+
+> **URL 등록: example/urls.py**
+```python
+from django.urls import path, include
+from .views import HelloAPI, bookAPI, booksAPI, BookAPI, BooksAPI, BooksAPIMixins, BookAPIMixins
+
+urlpatterns = [
+    path("hello/", HelloAPI),
+    path("fbv/books/", booksAPI),
+    path("fbv/book/<int:bid>/", bookAPI),
+    path("cbv/books/", BooksAPI.as_view()),
+    path("cbv/book/<int:bid>/", BookAPI.as_view()),
+    path("mixin/books/", BooksAPIMixins.as_view()),
+    path("mixin/book/<int:bid>/", BookAPIMixins.as_view()),
+]
+```
+> 그리고 http://127.0.0.1:8000/example/mixin/books/ 로 접속  
+> 각 URL에 따른 동작 확인  
+> 책 상세정보를 들어가면 PUT, DELETE 등의 버튼이 생성된 것을 확인할 수 있음(Mixins에서 제공)  
+
+### 4.4.3 DRF generics  
+
+> **9종류의 mixins 세트**  
+1. generics.ListAPIView (전체 목록)  
+2. generics.CreateAPIView (생성)  
+3. generics.RetrieveAPIView (1개)  
+4. generics.UpdateAPIView (1개 수정)  
+5. generics.DestroyAPIView (1개 삭제)  
+6. generics.ListCreateAPIView (전체 목록 + 생성)  
+7. generics.RetrieveUpdateAPIView (1개 + 1개 수정)  
+8. generics.RetrieveDestroyAPIView (1개 + 1개 삭제)  
+9. generics.RetrieveUpdateDestroyAPIView(1개 + 1개 수정 + 1개 삭제)  
+
+> **6번과 9번을 사용: example/views.py**
+```python
+...
+from rest_framework import generics
+...
+class BooksAPIGenerics(generics.ListCreateAPIView):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+
+class BookAPIGenerics(generics.RetrieveUpdateAPIView):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+    lookup_field = 'bid'
+```
+
+> **URL 연결: example/urls.py**
+```python
+from django.urls import path, include
+from .views import HelloAPI, bookAPI, booksAPI, BookAPI, BooksAPI, BooksAPIMixins, BookAPIMixins, BooksAPIGenerics, BookAPIGenerics
+
+urlpatterns = [
+    path("hello/", HelloAPI),
+    path("fbv/books/", booksAPI),
+    path("fbv/book/<int:bid>/", bookAPI),
+    path("cbv/books/", BooksAPI.as_view()),
+    path("cbv/book/<int:bid>/", BookAPI.as_view()),
+    path("mixin/books/", BooksAPIMixins.as_view()),
+    path("mixin/book/<int:bid>/", BookAPIMixins.as_view()),
+    path("generic/books/", BooksAPIGenerics.as_view()),
+    path("generic/book/<int:bid>", BookAPIGenerics.as_view()),
+]
+```
+
+> runserver이후에 url에 접속해서 확인했더니 잘 됨  
+> **generics는 mixins를 조합하기만 해놓은 코드**  
+
+### 4.4.4 DRF Viewset & Router  
+
+> Viewset에서는 하나의 클래스로 하나의 모델을 전부 처리해줄 수 있어 queryset이나 serializer_class 부분이 겹치지 않음  
+
+> **ModelViewSet: example/views.py**
+```python
+from rest_framework import viewsets
+...
+class BookViewSet(viewsets.ModelViewSet):
+    queryset = Book.objects.all()
+    serializer_class = BookSerializer
+```
+
+> ViewSet의 내부를 살펴보면 Mixin을 기반으로 작성함  
+
+> **라우터를 사용한 URL 연결: example/urls.py**
+```python
+from django.urls import path, include
+from rest_framework import routers
+from .views import HelloAPI, bookAPI, booksAPI, BookAPI, BooksAPI, BooksAPIMixins, BookAPIMixins, BooksAPIGenerics, BookAPIGenerics, BookViewSet
+
+router = routers.SimpleRouter()
+router.register('books', BookViewSet)
+
+# urlpatterns = [
+#     path("hello/", HelloAPI),
+#     path("fbv/books/", booksAPI),
+#     path("fbv/book/<int:bid>/", bookAPI),
+#     path("cbv/books/", BooksAPI.as_view()),
+#     path("cbv/book/<int:bid>/", BookAPI.as_view()),
+#     path("mixin/books/", BooksAPIMixins.as_view()),
+#     path("mixin/book/<int:bid>/", BookAPIMixins.as_view()),
+#     path("generic/books/", BooksAPIGenerics.as_view()),
+#     path("generic/book/<int:bid>", BookAPIGenerics.as_view()),
+# ]
+
+urlpatterns = router.urls
+```
+
+> ViewSet과 Router의 사용으로 다음과 같은 장점을 얻음  
+1. 하나의 클래스로 하나의 모델에 대한 내용을 전부 작성 가능 -> 중복 제거  
+2. 라우터를 통해 URL을 일일이 지정하지 않아도 일정한 규칙의 URL 생성 가능  
+
+> **위와 같은 기능들은 편리해지는 대신 자유도가 떨어지므로 프로젝트 목적에 따라 사용할지 여부를 결정하자**  
+
+***
+***
+***
